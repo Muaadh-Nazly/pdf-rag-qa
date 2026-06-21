@@ -26,7 +26,7 @@ Top-k Relevant Chunks → Groq LLaMA 3.3 → Answer
 
 ## 🎬 Demo
 
-> Upload a PDF, ask questions, get grounded answers with no hallucinations.
+![PDF RAG QA Demo](demo.png)
 
 ---
 

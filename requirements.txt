@@ -1,8 +1,7 @@
-langchain
-langchain-community
-langchain-google-genai
-google-generativeai
+google-genai==1.68.0
 faiss-cpu==1.7.4
+pypdf==6.12.1
+groq==1.4.0
+numpy<2
 streamlit
-pypdf
 python-dotenv

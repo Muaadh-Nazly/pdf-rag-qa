@@ -1,46 +1,38 @@
 import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import FAISS
+import numpy as np
+import faiss
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+EMBED_MODEL = "gemini-embedding-001"
 
-def build_vector_store(chunks: list) -> FAISS:
-    """
-    Convert document chunks into embeddings and store in FAISS index.
 
-    Args:
-        chunks: List of document chunks from ingestor
-
-    Returns:
-        FAISS vector store
-    """
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001", google_api_key=os.getenv("GOOGLE_API_KEY")
+def embed_texts(texts: list[str]) -> np.ndarray:
+    """Convert a list of text chunks into embeddings."""
+    response = client.models.embed_content(
+        model=EMBED_MODEL,
+        contents=texts,
+        config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
     )
-
-    vector_store = FAISS.from_documents(chunks, embeddings)
-    print(f"Vector store built with {len(chunks)} chunks")
-
-    return vector_store
+    return np.array([e.values for e in response.embeddings], dtype="float32")
 
 
-def save_vector_store(vector_store: FAISS, path: str = "faiss_index") -> None:
-    """Save FAISS index to disk."""
-    vector_store.save_local(path)
-    print(f"Vector store saved to {path}/")
+def build_index(embeddings: np.ndarray) -> faiss.IndexFlatL2:
+    """Build a FAISS index from embeddings."""
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dim)
+    index.add(embeddings)
+    print(f"FAISS index built with {index.ntotal} vectors")
+    return index
 
 
-def load_vector_store(path: str = "faiss_index") -> FAISS:
-    """Load FAISS index from disk."""
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001", google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
-
-    vector_store = FAISS.load_local(
-        path, embeddings, allow_dangerous_deserialization=True
-    )
-    print(f"Vector store loaded from {path}/")
-
-    return vector_store
+def build_vector_store(chunks: list[str]) -> tuple[faiss.IndexFlatL2, list[str]]:
+    """Full pipeline - embed chunks and return FAISS index + chunks."""
+    embeddings = embed_texts(chunks)
+    print(f"Embeddings shape: {embeddings.shape}")
+    index = build_index(embeddings)
+    return index, chunks

@@ -1,23 +1,38 @@
-from langchain_community.vectorstores import FAISS
+import os
+import numpy as np
+import faiss
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
+
+load_dotenv()
+
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+EMBED_MODEL = "gemini-embedding-001"
 
 
-def retrieve_relevant_chunks(vector_store: FAISS, query: str, k: int = 4) -> list:
+def retrieve_relevant_chunks(
+    query: str, index: faiss.IndexFlatL2, chunks: list[str], k: int = 4
+) -> list[str]:
     """
-    Retrieve the most relevant document chunks for a given query.
+    Embed the query and retrieve the k most relevant chunks from FAISS index.
 
     Args:
-        vector_store: FAISS vector store
-        query: User's question
+        query: User question
+        index: FAISS index built from document chunks
+        chunks: Original text chunks matching the index
         k: Number of chunks to retrieve
 
     Returns:
-        List of relevant document chunks
+        List of most relevant text chunks
     """
-    retriever = vector_store.as_retriever(
-        search_type="similarity", search_kwargs={"k": k}
+    response = client.models.embed_content(
+        model=EMBED_MODEL,
+        contents=[query],
+        config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
     )
-
-    relevant_chunks = retriever.invoke(query)
-    print(f"Retrieved {len(relevant_chunks)} relevant chunks for query")
-
-    return relevant_chunks
+    query_vec = np.array([response.embeddings[0].values], dtype="float32")
+    _, indices = index.search(query_vec, k)
+    relevant = [chunks[i] for i in indices[0] if i < len(chunks)]
+    print(f"Retrieved {len(relevant)} relevant chunks")
+    return relevant
